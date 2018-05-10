@@ -106,7 +106,7 @@
       <SubType>Designer</SubType>
     </AppxManifest>
     <None Include="AlarmML_TemporaryKey.pfx" />
-    <None Include="emotion_ferplus.onnx" />
+    <Content Include="emotion_ferplus.onnx" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Properties\Default.rd.xml" />

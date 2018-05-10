@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -70,7 +71,7 @@ namespace AlarmML
             faceDetector = await FaceDetector.CreateAsync();
 
             timer = new DispatcherTimer();
-            timer.Interval = TimeSpan.FromMilliseconds(100);
+            timer.Interval = TimeSpan.FromMilliseconds(300);
             timer.Tick += Timer_Tick;
             timer.Start();
 
@@ -97,7 +98,14 @@ namespace AlarmML
             }
 
             var bitmap = e.VideoFrame.SoftwareBitmap;
-            var faces = await faceDetector.DetectFacesAsync(bitmap);
+            if (bitmap == null)
+            {
+                return;
+            }
+
+            // faceDector requires Gray8 or Nv12
+            var convertedBitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Gray8);
+            var faces = await faceDetector.DetectFacesAsync(convertedBitmap);
 
             // if there is a face in the frame, evaluate the emotion
             var detectedFace = faces.FirstOrDefault();
@@ -108,7 +116,7 @@ namespace AlarmML
                                            detectedFace.FaceBox.Width,
                                            detectedFace.FaceBox.Height);
 
-                var croppedFace = Crop(bitmap, boundingBox);
+                var croppedFace = Crop(convertedBitmap, boundingBox);
 
                 CNTKGraphModelInput input = new CNTKGraphModelInput();
                 input.Input338 = VideoFrame.CreateWithSoftwareBitmap(croppedFace);
@@ -124,6 +132,11 @@ namespace AlarmML
                     if (lastTimeEmotionMatched != null && DateTime.Now - lastTimeEmotionMatched >= TimeSpan.FromSeconds(3))
                     {
                         alarmOn = false;
+                    }
+
+                    if (lastTimeEmotionMatched == null)
+                    {
+                        lastTimeEmotionMatched = DateTime.Now;
                     }
                 }
                 else
@@ -141,6 +154,11 @@ namespace AlarmML
         // crop
         public SoftwareBitmap Crop(SoftwareBitmap softwareBitmap, Rect bounds)
         {
+            if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8)
+            {
+                softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8);
+            }
+
             var resourceCreator = CanvasDevice.GetSharedDevice();
             using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, softwareBitmap))
             using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, (float)bounds.Width, (float)bounds.Width, canvasBitmap.Dpi))
