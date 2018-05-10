@@ -64,8 +64,7 @@ namespace AlarmML
                 "Contempt"
             };
 
-            Random random = new Random();
-            currentEmotionIndex = random.Next(labels.Count);
+            currentEmotionIndex = 1; //happiness
             EmotionText.Text = $"Show {labels[currentEmotionIndex]} to Snooze";
 
             faceDetector = await FaceDetector.CreateAsync();
@@ -84,6 +83,10 @@ namespace AlarmML
             if (alarmOn)
             {
                 Alarmbackground.Visibility = Alarmbackground.Visibility == Visibility.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                Alarmbackground.Visibility = Visibility.Collapsed;
             }
 
             TimeText.Text = DateTime.Now.ToShortTimeString();
@@ -122,9 +125,10 @@ namespace AlarmML
                 input.Input338 = VideoFrame.CreateWithSoftwareBitmap(croppedFace);
 
                 var emotionResults = await model.EvaluateAsync(input);
-                var softMaxOutputs = SoftMax(emotionResults.Plus692_Output_0);
-
-                var emotionIndex = softMaxOutputs.IndexOf(softMaxOutputs.Max());
+                
+                // to get percentages, you'd need to run the output through a softmax function
+                // we don't need percentages, we just need max value
+                var emotionIndex = emotionResults.Plus692_Output_0.IndexOf(emotionResults.Plus692_Output_0.Max());
 
                 if (emotionIndex == currentEmotionIndex)
                 {
@@ -154,6 +158,7 @@ namespace AlarmML
         // crop
         public SoftwareBitmap Crop(SoftwareBitmap softwareBitmap, Rect bounds)
         {
+            
             if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8)
             {
                 softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8);
@@ -179,25 +184,6 @@ namespace AlarmML
 
                 return SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, (int)bounds.Width, (int)bounds.Width, BitmapAlphaMode.Premultiplied);
             }
-        }
-
-        //softmax based on postporcessing notes on the input page on github
-        private List<float> SoftMax(IList<float> inputs)
-        {
-            List<float> inputsExp = new List<float>();
-            float inputsExpSum = 0;
-            for (int i = 0; i < inputs.Count; i++)
-            {
-                var input = inputs[i];
-                inputsExp.Add((float)Math.Exp(input));
-                inputsExpSum += inputsExp[i];
-            }
-            inputsExpSum = inputsExpSum == 0 ? 1 : inputsExpSum;
-            for (int i = 0; i < inputs.Count; i++)
-            {
-                inputsExp[i] /= inputsExpSum;
-            }
-            return inputsExp;
         }
     }
 }
