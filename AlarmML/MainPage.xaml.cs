@@ -7,6 +7,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
 using Microsoft.Toolkit.Uwp.Helpers.CameraHelper;
+using MLHelpers;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Graphics.Imaging;
@@ -14,6 +15,8 @@ using Windows.Media;
 using Windows.Media.FaceAnalysis;
 using Windows.Storage;
 using Windows.UI;
+using Windows.UI.Core;
+using Windows.UI.Input.Inking;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -36,10 +39,7 @@ namespace AlarmML
             this.InitializeComponent();
         }
 
-        CNTKGraphModel model;
-        FaceDetector faceDetector;
-        List<string> labels;
-        int currentEmotionIndex;
+        InkshapesModel model;
 
         DispatcherTimer timer;
         bool alarmOn = true;
@@ -49,32 +49,35 @@ namespace AlarmML
         protected async override void OnNavigatedTo(NavigationEventArgs e)
         {
             // load Model
-            var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///emotion_ferplus.onnx"));
-            model = await CNTKGraphModel.CreateCNTKGraphModel(file);
+            var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///model.onnx"));
+            model = await InkshapesModel.CreateInkshapesModel(file);
 
-            labels = new List<string>()
-            {
-                "Neutral",
-                "Happiness",
-                "Surprise",
-                "Sadness",
-                "Anger",
-                "Disgust",
-                "Fear",
-                "Contempt"
-            };
+            Inker.InkPresenter.InputDeviceTypes =
+            CoreInputDeviceTypes.Pen |
+            CoreInputDeviceTypes.Touch |
+            CoreInputDeviceTypes.Mouse;
 
-            currentEmotionIndex = 1; //happiness
-            EmotionText.Text = $"Show {labels[currentEmotionIndex]} to Snooze";
-
-            faceDetector = await FaceDetector.CreateAsync();
+            Inker.InkPresenter.StrokesCollected += InkPresenter_StrokesCollectedAsync;
 
             timer = new DispatcherTimer();
             timer.Interval = TimeSpan.FromMilliseconds(300);
             timer.Tick += Timer_Tick;
             timer.Start();
+        }
 
-            camera.FrameArrived += Preview_FrameArrived;
+        private async void InkPresenter_StrokesCollectedAsync(InkPresenter sender, InkStrokesCollectedEventArgs args)
+        {
+            var bitmap = Inker.GetCropedSoftwareBitmap(newWidth: 227, newHeight: 227, keepRelativeSize: true);
+            var frame = VideoFrame.CreateWithSoftwareBitmap(bitmap);
+            var input = new InkshapesModelInput();
+            input.data = frame;
+
+            var output = await model.EvaluateAsync(input);
+
+            var guessedTag = output.classLabel.First();
+            var guessedPercentage = output.loss.OrderByDescending(kv => kv.Value).First().Value.ToString();
+
+            GuessText.Text = $"Current Guess: {guessedTag}({guessedPercentage})";
         }
 
         // decide if the alarm should be on
@@ -92,98 +95,5 @@ namespace AlarmML
             TimeText.Text = DateTime.Now.ToShortTimeString();
         }
 
-        // get frame and analyze
-        private async void Preview_FrameArrived(object sender, FrameEventArgs e)
-        {
-            if (!alarmOn)
-            {
-                return;
-            }
-
-            var bitmap = e.VideoFrame.SoftwareBitmap;
-            if (bitmap == null)
-            {
-                return;
-            }
-
-            // faceDector requires Gray8 or Nv12
-            var convertedBitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Gray8);
-            var faces = await faceDetector.DetectFacesAsync(convertedBitmap);
-
-            // if there is a face in the frame, evaluate the emotion
-            var detectedFace = faces.FirstOrDefault();
-            if (detectedFace != null)
-            {
-                var boundingBox = new Rect(detectedFace.FaceBox.X,
-                                           detectedFace.FaceBox.Y,
-                                           detectedFace.FaceBox.Width,
-                                           detectedFace.FaceBox.Height);
-
-                var croppedFace = Crop(convertedBitmap, boundingBox);
-
-                CNTKGraphModelInput input = new CNTKGraphModelInput();
-                input.Input338 = VideoFrame.CreateWithSoftwareBitmap(croppedFace);
-
-                var emotionResults = await model.EvaluateAsync(input);
-                
-                // to get percentages, you'd need to run the output through a softmax function
-                // we don't need percentages, we just need max value
-                var emotionIndex = emotionResults.Plus692_Output_0.IndexOf(emotionResults.Plus692_Output_0.Max());
-
-                if (emotionIndex == currentEmotionIndex)
-                {
-                    // if the user has been dooing the same emotion for over 3 seconds - turn off alarm
-                    if (lastTimeEmotionMatched != null && DateTime.Now - lastTimeEmotionMatched >= TimeSpan.FromSeconds(3))
-                    {
-                        alarmOn = false;
-                    }
-
-                    if (lastTimeEmotionMatched == null)
-                    {
-                        lastTimeEmotionMatched = DateTime.Now;
-                    }
-                }
-                else
-                {
-                    lastTimeEmotionMatched = null;
-                }
-            }
-            else
-            {
-                // can't find face
-                lastTimeEmotionMatched = null;
-            }
-        }
-
-        // crop
-        public SoftwareBitmap Crop(SoftwareBitmap softwareBitmap, Rect bounds)
-        {
-            
-            if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8)
-            {
-                softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8);
-            }
-
-            var resourceCreator = CanvasDevice.GetSharedDevice();
-            using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, softwareBitmap))
-            using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, (float)bounds.Width, (float)bounds.Width, canvasBitmap.Dpi))
-            using (var drawingSession = canvasRenderTarget.CreateDrawingSession())
-            using (var cropEffect = new CropEffect())
-            using (var atlasEffect = new AtlasEffect())
-            {
-                drawingSession.Clear(Colors.White);
-
-                cropEffect.SourceRectangle = bounds;
-                cropEffect.Source = canvasBitmap;
-
-                atlasEffect.SourceRectangle = bounds;
-                atlasEffect.Source = cropEffect;
-
-                drawingSession.DrawImage(atlasEffect);
-                drawingSession.Flush();
-
-                return SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, (int)bounds.Width, (int)bounds.Width, BitmapAlphaMode.Premultiplied);
-            }
-        }
     }
 }

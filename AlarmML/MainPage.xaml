@@ -6,14 +6,31 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="using:Microsoft.Toolkit.Uwp.UI.Controls"
+    xmlns:media="using:Microsoft.Toolkit.Uwp.UI.Media"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <controls:CameraPreview x:Name="camera" />
-        <Border Background="Red" x:Name="Alarmbackground">
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1, 1">
+                <LinearGradientBrush.GradientStops>
+                    <GradientStop Color="#26d0ce"></GradientStop>
+                    <GradientStop Color="#1a2980" Offset="1"></GradientStop>
+                </LinearGradientBrush.GradientStops>
+            </LinearGradientBrush>
+        </Grid.Background>
+        <!--<controls:CameraPreview x:Name="camera" />-->
+        <Border x:Name="Alarmbackground">
             <TextBlock x:Name="EmotionText" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="40" Foreground="White" FontSize="30"></TextBlock>
         </Border>
-        <TextBlock x:Name="TimeText" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" Foreground="White" FontSize="200">12:00</TextBlock>
+
+        <controls:DropShadowPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            
+        <TextBlock x:Name="TimeText"  TextAlignment="Center" Foreground="#33333333" FontFamily="Consolas" FontWeight="Bold" FontSize="400">12:00</TextBlock>
+        </controls:DropShadowPanel>
+
+        <TextBlock x:Name="GuessText" />
+
+        <InkCanvas x:Name="Inker"></InkCanvas>
     </Grid>
 </Page>
