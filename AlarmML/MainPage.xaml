@@ -31,7 +31,9 @@
         <InkCanvas x:Name="Inker"></InkCanvas>
 
         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Padding="40">
-            <Button Content="Next Shape" Foreground="#66FFFFFF" Click="Button_Click"/>
+            <Button Foreground="#66FFFFFF" Click="Button_Click">
+                <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEDAB;" FontSize="40"/>
+            </Button>
         </StackPanel>
     </Grid>
 </Page>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
@@ -39,16 +40,18 @@ namespace AlarmML
             this.InitializeComponent();
         }
 
-        InkshapesModel model;
-
         DispatcherTimer timeTimer;
         bool alarmOn = true;
-
         InkDrawingAttributes ida;
         Random random = new Random((int)DateTime.Now.Ticks);
-
         MediaElement mediaElement;
 
+
+
+
+
+        InkshapesModel model;
+        private string currentShape;
         private List<string> shapeLabels = new List<string>()
         {
             "airplane",
@@ -74,10 +77,14 @@ namespace AlarmML
             "sun",
         };
 
-        private string currentShape;
-
         protected async override void OnNavigatedTo(NavigationEventArgs e)
         {
+            // load Model
+            var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///model.onnx"));
+            model = await InkshapesModel.CreateInkshapesModel(file);
+
+
+            #region setup InkCanvs, sound and timers
             currentShape = shapeLabels[random.Next(shapeLabels.Count)];
 
             timeTimer = new DispatcherTimer();
@@ -85,9 +92,6 @@ namespace AlarmML
             timeTimer.Tick += Timer_Tick;
             timeTimer.Start();
 
-            // load Model
-            var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///model.onnx"));
-            model = await InkshapesModel.CreateInkshapesModel(file);
 
             var alarmFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///wakeup.m4a"));
             var stream = await alarmFile.OpenAsync(FileAccessMode.Read);
@@ -111,6 +115,7 @@ namespace AlarmML
             Inker.InkPresenter.StrokesCollected += InkPresenter_StrokesCollectedAsync;
 
             SubText.Text = $"draw {currentShape} to Snooze";
+            #endregion
         }
 
         private async void InkPresenter_StrokesCollectedAsync(InkPresenter sender, InkStrokesCollectedEventArgs args)
@@ -136,6 +141,15 @@ namespace AlarmML
             else
             {
                 alarmOn = false;
+                foreach (var stroke in Inker.InkPresenter.StrokeContainer.GetStrokes())
+                {
+                    var attributes = stroke.DrawingAttributes;
+                    attributes.PencilProperties.Opacity = 1;
+                    attributes.Color = Colors.DarkBlue;
+                    attributes.Size = new Size(60, 60);
+                    stroke.DrawingAttributes = attributes;
+                    stroke.PointTransform = Matrix3x2.CreateScale(2, new Vector2((float)ActualWidth / 2, (float)ActualHeight /2));
+                }
             }
 
             Debug.WriteLine($"Current guess: {guessedTag}({guessedPercentage})");
