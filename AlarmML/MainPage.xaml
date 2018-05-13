@@ -19,18 +19,19 @@
                 </LinearGradientBrush.GradientStops>
             </LinearGradientBrush>
         </Grid.Background>
-        <!--<controls:CameraPreview x:Name="camera" />-->
-        <Border x:Name="Alarmbackground">
-            <TextBlock x:Name="EmotionText" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="40" Foreground="White" FontSize="30"></TextBlock>
-        </Border>
+        
+        <TextBlock x:Name="SubText" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="40" Foreground="#66FFFFFF" FontSize="30"></TextBlock>
 
-        <controls:DropShadowPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            
-        <TextBlock x:Name="TimeText"  TextAlignment="Center" Foreground="#33333333" FontFamily="Consolas" FontWeight="Bold" FontSize="400">12:00</TextBlock>
-        </controls:DropShadowPanel>
-
-        <TextBlock x:Name="GuessText" />
+        <Viewbox Margin="50">
+            <controls:DropShadowPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock x:Name="TimeText"  TextAlignment="Center" Foreground="#44ff0000" FontFamily="Consolas" FontWeight="Bold" FontSize="400">12:00</TextBlock>
+            </controls:DropShadowPanel>
+        </Viewbox>
 
         <InkCanvas x:Name="Inker"></InkCanvas>
+
+        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Padding="40">
+            <Button Content="Next Shape" Foreground="#66FFFFFF" Click="Button_Click"/>
+        </StackPanel>
     </Grid>
 </Page>

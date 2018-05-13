@@ -105,6 +105,7 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
+    <Content Include="wakeup.m4a" />
     <None Include="AlarmML_TemporaryKey.pfx" />
     <Content Include="model.onnx" />
   </ItemGroup>
