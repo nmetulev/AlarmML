@@ -5,10 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
 using Microsoft.Toolkit.Uwp.Helpers.CameraHelper;
 using MLHelpers;
+using Microsoft.Toolkit.Uwp.UI.Animations;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Graphics.Imaging;
@@ -41,14 +43,32 @@ namespace AlarmML
         }
 
         DispatcherTimer timeTimer;
-        bool alarmOn = true;
         InkDrawingAttributes ida;
         Random random = new Random((int)DateTime.Now.Ticks);
         MediaElement mediaElement;
+        bool animating = false;
 
-
-
-
+        private bool _alarmOn = true;
+        private bool AlarmOn
+        {
+            get { return _alarmOn; }
+            set {
+                if (_alarmOn != value)
+                {
+                    if (!value)
+                    {
+                        RunAlarmOffAnimation();
+                        mediaElement.Stop();
+                        SubText.Text = $"Good Morning!";
+                    }
+                    else
+                    {
+                        mediaElement.Play();
+                    }
+                }
+                _alarmOn = value;
+            }
+        }
 
         InkshapesModel model;
         private string currentShape;
@@ -122,8 +142,7 @@ namespace AlarmML
         {
             var bitmap = Inker.GetCropedSoftwareBitmap(newWidth: 227, newHeight: 227, keepRelativeSize: true);
             var frame = VideoFrame.CreateWithSoftwareBitmap(bitmap);
-            var input = new InkshapesModelInput();
-            input.data = frame;
+            var input = new InkshapesModelInput() { data = frame };
 
             var output = await model.EvaluateAsync(input);
 
@@ -132,15 +151,15 @@ namespace AlarmML
 
             if (guessedPercentage < 0.8)
             {
-                SubText.Text = $"draw {currentShape} to Snooze - don't know what that is";
+                SubText.Text = $"draw {currentShape} to snooze - don't know what that is";
             }
             else if (guessedTag != currentShape)
             {
-                SubText.Text = $"draw {currentShape} to Snooze - you drew {guessedTag}";
+                SubText.Text = $"draw {currentShape} to snooze - you drew {guessedTag}";
             }
             else
             {
-                alarmOn = false;
+                AlarmOn = false;
                 foreach (var stroke in Inker.InkPresenter.StrokeContainer.GetStrokes())
                 {
                     var attributes = stroke.DrawingAttributes;
@@ -155,26 +174,37 @@ namespace AlarmML
             Debug.WriteLine($"Current guess: {guessedTag}({guessedPercentage})");
         }
 
+        private async Task RunAlarmOnAnimation()
+        {
+            if (!animating)
+            {
+                animating = true;
+                var centerY = (float)AlarmIcon.ActualHeight / 2;
+                var centerX = (float)AlarmIcon.ActualWidth / 2;
+                await AlarmIcon.Rotate(10, centerX, centerY).Offset().Then()
+                               .Rotate(-10, centerX, centerY).Then()
+                               .Rotate(10, centerX, centerY).Then()
+                               .Rotate(-10, centerX, centerY).SetDurationForAll(100).StartAsync();
+                await Task.Delay(400);
+                animating = false;
+            }
+        }
+
+        private async Task RunAlarmOffAnimation()
+        {
+            animating = true;
+            await AlarmIcon.Offset(0, 400).StartAsync();
+            
+            animating = false;
+        }
+
         // decide if the alarm should be on
         private void Timer_Tick(object sender, object e)
         {
             var now = DateTime.Now;
-            if (alarmOn)
+            if (_alarmOn)
             {
-                if (now.Millisecond < 500)
-                {
-                    TimeText.Foreground = new SolidColorBrush(Color.FromArgb(0x44, 0xFF, 0, 0));
-                }
-                else
-                {
-                    TimeText.Foreground = new SolidColorBrush(Color.FromArgb(0x33, 0x33, 0x33, 0x33));
-                }
-            }
-            else
-            {
-                TimeText.Foreground = new SolidColorBrush(Color.FromArgb(0x33, 0x33, 0x33, 0x33));
-                SubText.Text = $"Good Morning!";
-                mediaElement.Stop();
+                RunAlarmOnAnimation();
             }
 
             foreach (var stroke in Inker.InkPresenter.StrokeContainer.GetStrokes())
@@ -193,12 +223,13 @@ namespace AlarmML
 
             Inker.InkPresenter.StrokeContainer.DeleteSelected();
 
-            TimeText.Text = now.ToShortTimeString();
+            TimeText.Text = now.Hour.ToString("00");
+            TimeMinutesText.Text = $":{now.Minute.ToString("00")}";
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            if (!alarmOn) alarmOn = true;
+            if (!AlarmOn) AlarmOn = true;
 
             currentShape = shapeLabels[random.Next(shapeLabels.Count)];
             SubText.Text = $"draw {currentShape} to Snooze";
