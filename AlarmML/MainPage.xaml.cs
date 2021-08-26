@@ -6,13 +6,15 @@ using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
-using Microsoft.Toolkit.Uwp.Helpers.CameraHelper;
+using Microsoft.Toolkit.Uwp.Helpers;
+using Windows.AI.MachineLearning;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Graphics.Imaging;
 using Windows.Media;
 using Windows.Media.FaceAnalysis;
 using Windows.Storage;
+using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -36,7 +38,7 @@ namespace AlarmML
             this.InitializeComponent();
         }
 
-        CNTKGraphModel model;
+        emotion_ferplusModel model;
         FaceDetector faceDetector;
         List<string> labels;
         int currentEmotionIndex;
@@ -50,7 +52,7 @@ namespace AlarmML
         {
             // load Model
             var file = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///emotion_ferplus.onnx"));
-            model = await CNTKGraphModel.CreateCNTKGraphModel(file);
+            model = await emotion_ferplusModel.CreateFromStreamAsync(file);
 
             labels = new List<string>()
             {
@@ -74,7 +76,8 @@ namespace AlarmML
             timer.Tick += Timer_Tick;
             timer.Start();
 
-            camera.FrameArrived += Preview_FrameArrived;
+            await camera.StartAsync();
+            camera.CameraHelper.FrameArrived += Preview_FrameArrived;
         }
 
         // decide if the alarm should be on
@@ -121,7 +124,7 @@ namespace AlarmML
 
                 var croppedFace = Crop(convertedBitmap, boundingBox);
 
-                CNTKGraphModelInput input = new CNTKGraphModelInput();
+                emotion_ferplusInput input = new emotion_ferplusInput();
                 input.Input338 = VideoFrame.CreateWithSoftwareBitmap(croppedFace);
 
                 var emotionResults = await model.EvaluateAsync(input);
@@ -185,5 +188,8 @@ namespace AlarmML
                 return SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, (int)bounds.Width, (int)bounds.Width, BitmapAlphaMode.Premultiplied);
             }
         }
+
+
+
     }
 }
